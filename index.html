@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Folder Content Processor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .dropzone {
+            border: 2px dashed #3b82f6;
+            transition: all 0.3s ease;
+        }
+        .dropzone.active {
+            border-color: #10b981;
+            background-color: rgba(16, 185, 129, 0.05);
+        }
+        .progress-bar {
+            transition: width 0.3s ease;
+        }
+        #outputText {
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+        }
+        .file-item:hover {
+            background-color: #f3f4f6;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-4xl">
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">Folder Content Processor</h1>
+            <p class="text-gray-600">Upload a folder to generate a single text file with all file paths and contents</p>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-md p-6 mb-8">
+            <div id="dropzone" class="dropzone rounded-lg p-8 text-center cursor-pointer">
+                <div class="flex flex-col items-center justify-center">
+                    <i class="fas fa-folder-open text-blue-500 text-5xl mb-4"></i>
+                    <h2 class="text-xl font-semibold text-gray-700 mb-2">Drag & Drop your folder here</h2>
+                    <p class="text-gray-500 mb-4">or</p>
+                    <button id="browseBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-6 rounded-lg transition duration-200">
+                        Browse Folder
+                    </button>
+                    <input type="file" id="folderInput" webkitdirectory directory multiple style="display: none;">
+                </div>
+            </div>
+
+            <div id="fileList" class="mt-6 hidden">
+                <h3 class="font-medium text-gray-700 mb-3">Selected Files:</h3>
+                <div id="filesContainer" class="border rounded-lg divide-y max-h-60 overflow-y-auto">
+                    <!-- Files will be listed here -->
+                </div>
+            </div>
+
+            <div id="progressContainer" class="mt-6 hidden">
+                <div class="flex justify-between mb-1">
+                    <span class="text-sm font-medium text-gray-700">Processing...</span>
+                    <span id="progressPercent" class="text-sm font-medium text-gray-700">0%</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2.5">
+                    <div id="progressBar" class="progress-bar bg-blue-600 h-2.5 rounded-full" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="outputSection" class="bg-white rounded-xl shadow-md p-6 hidden">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-semibold text-gray-700">Output</h2>
+                <button id="copyBtn" class="bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-4 rounded-lg transition duration-200 flex items-center">
+                    <i class="fas fa-copy mr-2"></i> Copy to Clipboard
+                </button>
+            </div>
+            <div class="border rounded-lg p-4 bg-gray-50">
+                <pre id="outputText" class="text-gray-800 overflow-x-auto max-h-96"></pre>
+            </div>
+            <div class="mt-4 flex justify-end">
+                <button id="downloadBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-6 rounded-lg transition duration-200 flex items-center">
+                    <i class="fas fa-download mr-2"></i> Download as TXT
+                </button>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-md p-6 mt-6">
+            <h2 class="text-xl font-semibold text-gray-700 mb-4">How it works</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="bg-blue-50 p-4 rounded-lg">
+                    <div class="text-blue-500 mb-2">
+                        <i class="fas fa-upload text-2xl"></i>
+                    </div>
+                    <h3 class="font-medium text-gray-800 mb-1">1. Upload Folder</h3>
+                    <p class="text-gray-600 text-sm">Select or drag & drop any folder from your computer</p>
+                </div>
+                <div class="bg-purple-50 p-4 rounded-lg">
+                    <div class="text-purple-500 mb-2">
+                        <i class="fas fa-cogs text-2xl"></i>
+                    </div>
+                    <h3 class="font-medium text-gray-800 mb-1">2. Automatic Processing</h3>
+                    <p class="text-gray-600 text-sm">The app will scan all files and extract their contents</p>
+                </div>
+                <div class="bg-green-50 p-4 rounded-lg">
+                    <div class="text-green-500 mb-2">
+                        <i class="fas fa-file-alt text-2xl"></i>
+                    </div>
+                    <h3 class="font-medium text-gray-800 mb-1">3. Get Results</h3>
+                    <p class="text-gray-600 text-sm">Copy or download a single text file with all contents</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const dropzone = document.getElementById('dropzone');
+            const browseBtn = document.getElementById('browseBtn');
+            const folderInput = document.getElementById('folderInput');
+            const fileList = document.getElementById('fileList');
+            const filesContainer = document.getElementById('filesContainer');
+            const progressContainer = document.getElementById('progressContainer');
+            const progressBar = document.getElementById('progressBar');
+            const progressPercent = document.getElementById('progressPercent');
+            const outputSection = document.getElementById('outputSection');
+            const outputText = document.getElementById('outputText');
+            const copyBtn = document.getElementById('copyBtn');
+            const downloadBtn = document.getElementById('downloadBtn');
+
+            let files = [];
+            let outputContent = '';
+
+            // Handle drag and drop events
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropzone.addEventListener(eventName, preventDefaults, false);
+            });
+
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropzone.addEventListener(eventName, highlight, false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropzone.addEventListener(eventName, unhighlight, false);
+            });
+
+            function highlight() {
+                dropzone.classList.add('active');
+            }
+
+            function unhighlight() {
+                dropzone.classList.remove('active');
+            }
+
+            // Handle dropped files
+            dropzone.addEventListener('drop', handleDrop, false);
+
+            function handleDrop(e) {
+                const dt = e.dataTransfer;
+                const droppedFiles = dt.files;
+                
+                // Check if any items are directories (webkit only)
+                if (dt.items) {
+                    for (let i = 0; i < dt.items.length; i++) {
+                        const item = dt.items[i];
+                        if (item.kind === 'file' && item.webkitGetAsEntry().isDirectory) {
+                            handleFiles(droppedFiles);
+                            return;
+                        }
+                    }
+                }
+                
+                alert('Please drop a folder, not individual files');
+            }
+
+            // Browse button click
+            browseBtn.addEventListener('click', () => {
+                folderInput.click();
+            });
+
+            // Folder input change
+            folderInput.addEventListener('change', function() {
+                handleFiles(this.files);
+            });
+
+            // Process selected files
+            function handleFiles(selectedFiles) {
+                files = Array.from(selectedFiles);
+                
+                if (files.length === 0) return;
+                
+                // Show file list
+                filesContainer.innerHTML = '';
+                files.forEach((file, index) => {
+                    const fileItem = document.createElement('div');
+                    fileItem.className = 'file-item p-3 flex items-center';
+                    fileItem.innerHTML = `
+                        <div class="flex-grow truncate">
+                            <i class="fas fa-file-alt text-gray-500 mr-2"></i>
+                            <span class="text-gray-700">${file.webkitRelativePath || file.name}</span>
+                        </div>
+                        <div class="text-gray-500 text-sm">
+                            ${formatFileSize(file.size)}
+                        </div>
+                    `;
+                    filesContainer.appendChild(fileItem);
+                });
+                
+                fileList.classList.remove('hidden');
+                
+                // Process files
+                processFiles();
+            }
+
+            // Format file size
+            function formatFileSize(bytes) {
+                if (bytes === 0) return '0 Bytes';
+                const k = 1024;
+                const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            }
+
+            // Process all files
+            function processFiles() {
+                progressContainer.classList.remove('hidden');
+                outputContent = '';
+                outputSection.classList.add('hidden');
+                
+                let processedCount = 0;
+                
+                files.forEach(file => {
+                    const reader = new FileReader();
+                    
+                    reader.onload = function(e) {
+                        const content = e.target.result;
+                        outputContent += `=== FILE: ${file.webkitRelativePath || file.name} ===\n\n`;
+                        outputContent += content + '\n\n';
+                        
+                        processedCount++;
+                        updateProgress(processedCount);
+                        
+                        if (processedCount === files.length) {
+                            showOutput();
+                        }
+                    };
+                    
+                    reader.onerror = function() {
+                        outputContent += `=== ERROR READING FILE: ${file.webkitRelativePath || file.name} ===\n\n`;
+                        
+                        processedCount++;
+                        updateProgress(processedCount);
+                        
+                        if (processedCount === files.length) {
+                            showOutput();
+                        }
+                    };
+                    
+                    reader.readAsText(file);
+                });
+            }
+            
+            // Update progress bar
+            function updateProgress(processedCount) {
+                const percent = Math.round((processedCount / files.length) * 100);
+                progressBar.style.width = `${percent}%`;
+                progressPercent.textContent = `${percent}%`;
+            }
+            
+            // Show final output
+            function showOutput() {
+                progressContainer.classList.add('hidden');
+                outputText.textContent = outputContent;
+                outputSection.classList.remove('hidden');
+            }
+            
+            // Copy to clipboard
+            copyBtn.addEventListener('click', function() {
+                navigator.clipboard.writeText(outputContent).then(() => {
+                    const originalText = copyBtn.innerHTML;
+                    copyBtn.innerHTML = '<i class="fas fa-check mr-2"></i> Copied!';
+                    copyBtn.classList.remove('bg-green-500');
+                    copyBtn.classList.add('bg-green-600');
+                    
+                    setTimeout(() => {
+                        copyBtn.innerHTML = originalText;
+                        copyBtn.classList.remove('bg-green-600');
+                        copyBtn.classList.add('bg-green-500');
+                    }, 2000);
+                }).catch(err => {
+                    alert('Failed to copy text: ' + err);
+                });
+            });
+            
+            // Download as TXT file
+            downloadBtn.addEventListener('click', function() {
+                const blob = new Blob([outputContent], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'folder_contents.txt';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            });
+        });
+    </script>
+</body>
+</html>
